@@ -1,5 +1,10 @@
 import torch
 import warnings
+
+# from torch.nn import Conv1d
+# from main import set_environment
+# from utils.costom_logger import timeLogger
+
 torch.autograd.set_detect_anomaly(True)
 warnings.simplefilter("ignore")
 import torchvision
@@ -39,14 +44,14 @@ def backward_hook(module: nn.Module, inp_grad, out_grad):
     # print('backward_hook, layer_id:{}, hs_size:{}'.format(layer_id, out_grad[0].size()))
 
 
-def build_model(pretrainewd_path: str,
-                img_size: int, 
-                fpn_size: int, 
+def build_model(pretrained_path: str,
+                img_size: int,
+                fpn_size: int,
                 num_classes: int,
                 num_selects: dict,
-                use_fpn: bool = True, 
+                use_fpn: bool = True,
                 use_selection: bool = True,
-                use_combiner: bool = True, 
+                use_combiner: bool = True,
                 comb_proj_size: int = None):
     from models.pim_module.pim_module_eval import PluginMoodel
 
@@ -58,15 +63,31 @@ def build_model(pretrainewd_path: str,
                      upsample_type = "Conv",
                      use_selection = use_selection,
                      num_classes = num_classes,
-                     num_selects = num_selects, 
+                     num_selects = num_selects,
                      use_combiner = use_combiner,
                      comb_proj_size = comb_proj_size)
 
-    if pretrainewd_path != "":
-        ckpt = torch.load(pretrainewd_path)
+    if pretrained_path != "":
+        ckpt = torch.load(pretrained_path) if torch.cuda.is_available() else \
+            torch.load(pretrained_path, map_location=torch.device('cpu'))
         model.load_state_dict(ckpt['model'])
-    
+
+    # newsize = 11300
+    # model.fpn_classifier_down_layer1[3] = nn.Conv1d(1536, newsize, kernel_size=(1,), stride=(1,))
+    # model.fpn_classifier_down_layer2[3] = nn.Conv1d(1536, newsize, kernel_size=(1,), stride=(1,))
+    # model.fpn_classifier_down_layer3[3] = nn.Conv1d(1536, newsize, kernel_size=(1,), stride=(1,))
+    # model.fpn_classifier_down_layer4[3] = nn.Conv1d(1536, newsize, kernel_size=(1,), stride=(1,))
+    # model.fpn_classifier_up_layer1[3] = nn.Conv1d(1536, newsize, kernel_size=(1,), stride=(1,))
+    # model.fpn_classifier_up_layer2[3] = nn.Conv1d(1536, newsize, kernel_size=(1,), stride=(1,))
+    # model.fpn_classifier_up_layer3[3] = nn.Conv1d(1536, newsize, kernel_size=(1,), stride=(1,))
+    # model.fpn_classifier_up_layer4[3] = nn.Conv1d(1536, newsize, kernel_size=(1,), stride=(1,))
+    # model.combiner.classifier = nn.Linear(1536, newsize)
+    # checkpoint = {"model": model.state_dict(), "optimizer": ckpt['optimizer'], "epoch": ckpt['epoch']}
+    # torch.save(checkpoint, f"newsize-{newsize}.pt")
+    # print(model)
+
     model.eval()
+
 
     ### hook original layer1~4
     model.backbone.layers[0].register_forward_hook(forward_hook)
@@ -111,7 +132,7 @@ def cal_backward(args, out, sum_type: str = "softmax"):
             tmp_out = out[name].mean(1)
         else:
             tmp_out = out[name]
-        
+
         if sum_type == "softmax":
             tmp_out = torch.softmax(tmp_out, dim=-1)
 
@@ -178,7 +199,7 @@ if __name__ == "__main__":
     """
     # ===== 0. get setting =====
     parser = argparse.ArgumentParser("Visualize SwinT Large")
-    parser.add_argument("-pr", "--pretrained_root", type=str, 
+    parser.add_argument("-pr", "--pretrained_root", type=str,
         help="contain {pretrained_root}/best.pt, {pretrained_root}/config.yaml")
     parser.add_argument("-img", "--image", type=str)
     parser.add_argument("-sn", "--save_name", type=str)
@@ -186,13 +207,13 @@ if __name__ == "__main__":
     parser.add_argument("-usl", "--use_label", default=False, type=bool)
     parser.add_argument("-sum_t", "--sum_features_type", default="softmax", type=str)
     args = parser.parse_args()
-    
+
     load_yaml(args, args.pretrained_root + "/config.yaml")
 
     # ===== 1. build model =====
-    model = build_model(pretrainewd_path = args.pretrained_root + "/best.pt",
-                        img_size = args.data_size, 
-                        fpn_size = args.fpn_size, 
+    model = build_model(pretrained_path=args.pretrained_root + "/best.pt",
+                        img_size = args.data_size,
+                        fpn_size = args.fpn_size,
                         num_classes = args.num_classes,
                         num_selects = args.num_selects)
 
@@ -205,7 +226,7 @@ if __name__ == "__main__":
     out = model(img)
 
     cal_backward(args, out, sum_type="softmax")
-    
+
     # ===== 4. check result =====
     grad_weights = get_grad_cam_weights(grads)
     act_maps = plot_grad_cam(features, grad_weights)
@@ -228,7 +249,7 @@ if __name__ == "__main__":
             sum_act = r_act
         else:
             sum_act *= r_act
-    
+
     sum_act /= sum_act.max()
     sum_act = torchvision.transforms.functional.adjust_gamma(sum_act, 1.0)
     sum_act = sum_act.numpy()[0]
@@ -242,10 +263,10 @@ if __name__ == "__main__":
     plt.imshow(ori_img[:, :, ::-1] / 255)
     plt.imshow(sum_act, alpha=0.5, cmap=cmap) # , alpha=0.5, cmap='jet'
     plt.axis('off')
-    plt.savefig("./{}.jpg".format(args.save_name), 
+    plt.savefig("./{}.jpg".format(args.save_name),
         bbox_inches='tight', pad_inches=0.0, transparent=True)
     plt.show()
-    
+
     # cv2.namedWindow("ori", 0)
     # cv2.imshow("ori", ori_img)
     # cv2.namedWindow("heat", 0)
