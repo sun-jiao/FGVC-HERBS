@@ -5,7 +5,7 @@ import torch
 import torchvision.transforms as transforms
 from PIL import Image
 import copy
-import torch
+import torch.utils.data
 
 from .randaug import RandAugment
 

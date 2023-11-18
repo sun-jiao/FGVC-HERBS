@@ -34,7 +34,7 @@ class GCNCombiner(nn.Module):
                 elif len(name) == 3:
                     in_size = inputs[name].size(2)
                 else:
-                    raise ValusError("The size of output dimension of previous must be 3 or 4.")
+                    raise ValueError("The size of output dimension of previous must be 3 or 4.")
                 m = nn.Sequential(
                     nn.Linear(in_size, proj_size),
                     nn.ReLU(),
@@ -432,7 +432,7 @@ class PluginMoodel(nn.Module):
                 elif len(fs_size) == 4:
                     out_size = fs_size.size(1)
                 else:
-                    raise ValusError("The size of output dimension of previous must be 3 or 4.")
+                    raise ValueError("The size of output dimension of previous must be 3 or 4.")
             self.classifier = nn.Linear(out_size, num_classes)
 
         ### = = = = = FPN = = = = =
