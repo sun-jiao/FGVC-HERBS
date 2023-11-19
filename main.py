@@ -4,7 +4,6 @@ import torch.nn.functional as F
 import contextlib
 import wandb
 import warnings
-import copy
 
 from models.builder import MODEL_GETTER
 from data.dataset import build_loader
@@ -15,6 +14,7 @@ from eval import evaluate, cal_train_metrics, suppression
 
 warnings.simplefilter("ignore")
 
+torch.multiprocessing.set_sharing_strategy('file_system')
 
 
 def eval_freq_schedule(args, epoch: int):

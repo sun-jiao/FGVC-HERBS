@@ -1,25 +1,28 @@
+import math
 import os
-import numpy as np
+
 import cv2
 import torch
+import torch.utils.data
 import torchvision.transforms as transforms
 from PIL import Image
-import copy
-import torch.utils.data
-
-from .randaug import RandAugment
+from torch.utils.data import RandomSampler
 
 
 def build_loader(args):
     train_set, train_loader = None, None
     if args.train_root is not None:
         train_set = ImageDataset(istrain=True, root=args.train_root, data_size=args.data_size, return_index=True)
-        train_loader = torch.utils.data.DataLoader(train_set, num_workers=args.num_workers, shuffle=True, batch_size=args.batch_size)
+        num_samples = int(math.ceil(len(train_set) * args.sampling_ratio))
+        train_sampler = RandomSampler(data_source=train_set, num_samples=num_samples, replacement=True)
+        train_loader = torch.utils.data.DataLoader(train_set, num_workers=args.num_workers, sampler=train_sampler, batch_size=args.batch_size)
 
     val_set, val_loader = None, None
     if args.val_root is not None:
         val_set = ImageDataset(istrain=False, root=args.val_root, data_size=args.data_size, return_index=True)
-        val_loader = torch.utils.data.DataLoader(val_set, num_workers=1, shuffle=True, batch_size=args.batch_size)
+        num_samples = int(math.ceil(len(val_set) * args.sampling_ratio))
+        val_sampler = RandomSampler(data_source=val_set, num_samples=num_samples, replacement=True)
+        val_loader = torch.utils.data.DataLoader(val_set, num_workers=1, sampler=val_sampler, batch_size=args.batch_size)
 
     return train_loader, val_loader
 
@@ -76,6 +79,9 @@ class ImageDataset(torch.utils.data.Dataset):
         """ read all data information """
         self.data_infos = self.getDataInfo(root)
 
+        # 重新生成类别到索引的映射
+        self.classes, self.class_to_idx = self._find_classes(self.root)
+
 
     def getDataInfo(self, root):
         data_infos = []
@@ -110,3 +116,11 @@ class ImageDataset(torch.utils.data.Dataset):
         
         # return img, sub_imgs, label, sub_boundarys
         return img, label
+
+    def _find_classes(self, dir):
+        class_to_idx = {d.split('.', 1)[1]: int(d.split('.')[0]) for d in os.listdir(dir) if
+                        os.path.isdir(os.path.join(dir, d))}
+        classes = [d.split('.', 1)[1] for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d))]
+        classes.sort()
+
+        return classes, class_to_idx

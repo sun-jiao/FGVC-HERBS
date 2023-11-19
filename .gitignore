@@ -133,6 +133,7 @@ images/*
 small_data/*
 hymenoptera_data/*
 pretrain/*
+records/*
 *.csv
 *.xlsx
 sampler.pkl
